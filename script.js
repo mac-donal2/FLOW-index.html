@@ -1,7 +1,9 @@
 const playerInstance = jwplayer("player");
 jwplayer.key = "XSuP4qMl+9tK17QNb+4+th2Pm9AWgMO/cYH8CI0HGGr7bdjo"
-let currentChannel = channelList[0];
-let indexActivo = 0;
+let lastChannel = localStorage.getItem("lastChannelID")
+let currentChannel = channelList[lastChannel] || channelList[0];
+let indexActivo = Number(lastChannel) || 0;
+let isShowing = true
 const platform = window.navigator.platform
 const crossIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" style="fill: rgba(255, 255, 255, 1);transform: ;msFilter:;"><path d="m16.192 6.344-4.243 4.242-4.242-4.242-1.414 1.414L10.535 12l-4.242 4.242 1.414 1.414 4.242-4.242 4.243 4.242 1.414-1.414L13.364 12l4.242-4.242z"></path></svg>'
 const listIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" style="fill: rgba(255 , 255  , 255 , 1);transform: ;msFilter:;"><path d="M5.282 12.064c-.428.328-.72.609-.875.851-.155.24-.249.498-.279.768h2.679v-.748H5.413c.081-.081.152-.151.212-.201.062-.05.182-.142.361-.27.303-.218.511-.42.626-.604.116-.186.173-.375.173-.578a.898.898 0 0 0-.151-.512.892.892 0 0 0-.412-.341c-.174-.076-.419-.111-.733-.111-.3 0-.537.038-.706.114a.889.889 0 0 0-.396.338c-.094.143-.159.346-.194.604l.894.076c.025-.188.074-.317.147-.394a.375.375 0 0 1 .279-.108c.11 0 .2.035.272.108a.344.344 0 0 1 .108.258.55.55 0 0 1-.108.297c-.074.102-.241.254-.503.453zm.055 6.386a.398.398 0 0 1-.282-.105c-.074-.07-.128-.195-.162-.378L4 18.085c.059.204.142.372.251.506.109.133.248.235.417.306.168.069.399.103.692.103.3 0 .541-.047.725-.14a1 1 0 0 0 .424-.403c.098-.175.146-.354.146-.544a.823.823 0 0 0-.088-.393.708.708 0 0 0-.249-.261 1.015 1.015 0 0 0-.286-.11.943.943 0 0 0 .345-.299.673.673 0 0 0 .113-.383.747.747 0 0 0-.281-.596c-.187-.159-.49-.238-.909-.238-.365 0-.648.072-.847.219-.2.143-.334.353-.404.626l.844.151c.023-.162.067-.274.133-.338s.151-.098.257-.098a.33.33 0 0 1 .241.089c.059.06.087.139.087.238 0 .104-.038.193-.117.27s-.177.112-.293.112a.907.907 0 0 1-.116-.011l-.045.649a1.13 1.13 0 0 1 .289-.056c.132 0 .237.041.313.126.077.082.115.199.115.352 0 .146-.04.266-.119.354a.394.394 0 0 1-.301.134zm.948-10.083V5h-.739a1.47 1.47 0 0 1-.394.523c-.168.142-.404.262-.708.365v.754a2.595 2.595 0 0 0 .937-.48v2.206h.904zM9 6h11v2H9zm0 5h11v2H9zm0 5h11v2H9z"></path></svg>'
@@ -19,20 +21,20 @@ async function setupPlayer() {
           type: "dash",
           file: mpd,
           drm: {
-            clearkey: { keyId: channelList[0].keyId, key: channelList[0].key }
+            clearkey: { keyId: currentChannel.keyId, key: currentChannel.key }
           }
         }]
       }],
       width: "100%",
-      height: "100vh",
+      height: "100dvh",
       aspectratio: "16:9",
       autostart: "true",
       cast: {},
-      sharing: {}
     });
 
     playerInstance.on("firstFrame", function () {
       setProgramInfo(currentChannel)
+      localStorage.setItem("lastChannelID", channelList.findIndex((f) => f.getURL == currentChannel.getURL) || 0);
     })
 
     playerInstance.on('audioTracks', (e) => {
@@ -82,21 +84,29 @@ async function setupPlayer() {
         location.reload()
       }
       localStorage.setItem("jwplayer.qualityLabel", "1080p");
-      playerInstance.setMute(0);
-      playerInstance.setVolume(100);
+      if (platform != 'Win32') {
+        playerInstance.setMute(0);
+        playerInstance.setVolume(100);
+      }
       if (platform != 'Win32') playerInstance.setFullscreen(true);
       // Crea contenedor de canales
       const channelListElement = document.createElement("div");
       channelListElement.classList = "channelList";
       channelListElement.style.display = 'block'
       channelListElement.addEventListener("click", changeChannel);
+      if (platform == 'Win32') channelListElement.classList.add('desktop');
       player.prepend(channelListElement);
 
       // Crea pop-up seleccion numero de canal
       const channelNumberElement = document.createElement("div");
+      const channelNumberElementContainer = document.createElement("div");
+      channelNumberElementContainer.classList = "channelNumberContainer";
       const channelNumberElementText = document.createElement("span");
+      const channelNumberElementImage = document.createElement("img");
       channelNumberElement.classList = "channelNumber";
-      channelNumberElement.append(channelNumberElementText);
+      channelNumberElementContainer.append(channelNumberElementImage);
+      channelNumberElementContainer.append(channelNumberElementText);
+      channelNumberElement.append(channelNumberElementContainer);
       player.prepend(channelNumberElement);
 
       // Crea info del programa
@@ -127,7 +137,7 @@ async function setupPlayer() {
       channelList.forEach((e, i) => {
         const btn = document.createElement("button");
         const cnImage = document.createElement("img");
-        cnImage.src = '/canales/canales/logos/' + (e.img || 'canal.webp')
+        cnImage.src = 'canales/logos/' + (e.img || 'canal.webp')
         const cnName = document.createElement("span");
         cnName.innerText = e.name || atob(e.getURL).replaceAll("_", " ");
         const cnNumber = document.createElement("span");
@@ -151,6 +161,7 @@ async function setupPlayer() {
         }
       }
       enfocarElemento(indexActivo);
+      elementos[lastChannel || 0].classList.add('active')
 
       document.addEventListener("keydown", (e) => {
 
@@ -162,25 +173,33 @@ async function setupPlayer() {
         if (e.key === "ArrowDown") {
           e.preventDefault();
           changeLeftPos()
-          getChannelList.style.display = "block";
+          // getChannelList.style.display = "block";
+          getChannelList.style.transform = `translateX(0px)`
           // Flecha abajo, mover al siguiente elemento
           indexActivo = (indexActivo + 1) % elementos.length;
+          isShowing = true
           enfocarElemento(indexActivo);
         } else if (e.key === "ArrowUp") {
           e.preventDefault();
           changeLeftPos()
-          getChannelList.style.display = "block";
+          // getChannelList.style.display = "block";
+          getChannelList.style.transform = `translateX(0px)`
           // Flecha arriba, mover al anterior elemento
           indexActivo = (indexActivo - 1 + elementos.length) % elementos.length;
+          isShowing = true
           enfocarElemento(indexActivo);
         } else if (e.key === "ArrowLeft") {
-          platform == 'Win32' && getChannelList.style.display == "block" && hideArrow();
-          getChannelList.style.display = "none";
+          platform == 'Win32' && isShowing && hideArrow();
+          // getChannelList.style.display = "none";
+          getChannelList.style.transform = `translateX(-${getChannelList.offsetWidth}px)`
           document.querySelector(':root').style.setProperty('--leftPos', '0px')
+          isShowing = false
         } else if (e.key === "ArrowRight") {
-          platform == 'Win32' && getChannelList.style.display == "none" && hideArrow();
-          getChannelList.style.display = "block";
+          platform == 'Win32' && !isShowing && hideArrow();
+          // getChannelList.style.display = "block";
+          getChannelList.style.transform = `translateX(0px)`
           changeLeftPos()
+          isShowing = true
           enfocarElemento(indexActivo);
         }
       });
@@ -202,17 +221,22 @@ async function setupPlayer() {
 
         function hideArrow () {
           const getChannelList = document.querySelector(".channelList");
-          let visible = getChannelList.style.display
-          if (visible == 'block'){
-            getChannelList.style.display = 'none'
+          // let visible = getChannelList.style.display
+          let visible = isShowing
+          if (visible){
+            // getChannelList.style.display = 'none'
+            getChannelList.style.transform = `translateX(-${getChannelList.offsetWidth}px)`
             document.querySelector(':root').style.setProperty('--leftPos', '0px')
             listArrow.innerHTML = listIcon
             listArrow.classList.add('fs')
+            isShowing = false
           } else {
-            getChannelList.style.display = 'block'
+            // getChannelList.style.display = 'block'
+            getChannelList.style.transform = `translateX(0px)`
             changeLeftPos()
             listArrow.innerHTML = crossIcon
             listArrow.classList.remove('fs')
+            isShowing = true
             enfocarElemento(indexActivo)
           }
         }
@@ -231,13 +255,20 @@ const changeChannel = async (e, channelNumber, refreshList) => {
   const selectedChannel = e?.target.getAttribute("getURL") || e?.target.parentElement.getAttribute("getURL") || channelList[channelNumber - 1]?.getURL || refreshList;
   const channelInfo = channelList.find((f) => f.getURL == selectedChannel);
   const mpd = await getValidMpd(channelInfo);
+  const elementos = document.querySelectorAll('[tabindex="0"]')
+  const currentChannelNum = channelList.findIndex((f) => f.getURL == selectedChannel)
   
+  const toggleActiveChannel = (activeChanel) => {
+    elementos.forEach(channel => channel.classList.remove('active'))
+    activeChanel.classList.add('active');
+  }
+
+  toggleActiveChannel(elementos[currentChannelNum])
+
   if (platform == 'Win32') {
-    const currentChannelNum = channelList.findIndex((f) => f.getURL == selectedChannel)
     indexActivo = currentChannelNum
-    
+
     // Temporal
-    const elementos = document.querySelectorAll('[tabindex="0"]')
     function enfocarElemento(index) {
       if (index >= 0 && index < elementos.length) {
         elementos[index].focus();
@@ -274,8 +305,10 @@ const changeChannel = async (e, channelNumber, refreshList) => {
 
   playerInstance.stop()
   playerInstance.play()
-  playerInstance.setMute(0);
-  playerInstance.setVolume(100);
+  if (platform != 'Win32') {
+    playerInstance.setMute(0);
+    playerInstance.setVolume(100);
+  }
   // playerInstance.setCurrentQuality(1);
 };
 
@@ -293,7 +326,7 @@ const setProgramInfo = async (channelInfo) => {
     clearTimeout(programTimer)
     runProgramTimer()
     programInfoElement.querySelector('.programImage .programImageBanner').src = `https://spotlight-ar.cdn.telefonica.com/customer/v1/source?image=${encodeURIComponent(Url)}?width=240&height=135&resize=CROP&format=WEBP`
-    programInfoElement.querySelector('.programImage .channelImage').src = `/canales/canales/logos/${(channelInfo.img || 'canal.webp')}`
+    programInfoElement.querySelector('.programImage .channelImage').src = `canales/logos/${(channelInfo.img || 'canal.webp')}`
     programInfoElement.querySelector('.programDescription h1').innerText = Title
     programInfoElement.querySelector('.programDescription p').innerText = Description
     programInfoElement.querySelector('.programDescription span').innerText = `${new Date(Start * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(End * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
@@ -364,7 +397,7 @@ let mt = [
 async function getURLwithToken() {
   let token = sessionStorage.getItem('token')
   if (!token) {
-    const url = 'https://chromecast.cvattv.com.ar/live/c7eds/La_Nacion/SA_Live_dash_enc/La_Nacion.m3u8';
+    const url = 'https://chromecast.cvattv.com.ar/live/c7eds/La_Nacion/SA_Live_dash_enc_wl/La_Nacion.m3u8';
     let response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (response.redirected) {
       const regex = /(https:\/\/.+?)(?=\/live)/;
@@ -381,7 +414,7 @@ async function getURLwithToken() {
 // Comprueba dominios y lo asigna
 let mt2 = [...mt];
 async function getValidMpd(channelInfo) {
-  const channelToLoad = channelInfo || channelList[0];
+  const channelToLoad = channelInfo || channelList[lastChannel] || channelList[0];
   currentChannel = channelToLoad;
   if (channelToLoad.type == 'external') return channelToLoad.getURL
   let getMPDTries = 0
@@ -478,12 +511,18 @@ const runTimer = () => {
 };
 
 document.addEventListener("keypress", (e) => {
-  if (!(e.keyCode >= 48 && e.keyCode <= 57)) return;
-  if (pressed.length > 2) return;
-  document.querySelector(".channelNumber").style.visibility = "visible";
   const channelNumberBox = document.querySelector(".channelNumber span");
+  const channelNumberImage = document.querySelector(".channelNumber img");
+  if (!(e.keyCode >= 48 && e.keyCode <= 57)) return;
+  if (pressed.length > 2) {
+    pressed = ""
+    channelNumberBox.innerText = ""
+  };
+  document.querySelector(".channelNumber").style.visibility = "visible";
   pressed += e.key;
   channelNumberBox.innerText = pressed;
+  const channelLimit = (pressed - 1) < channelList.length
+  channelNumberImage.src = channelLimit ? 'canales/logos/' + (channelList[pressed - 1].img) : 'logo.svg'
   if (pressed.length >= 1) {
     clearTimeout(timer);
     runTimer();
